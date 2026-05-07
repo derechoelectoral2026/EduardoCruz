@@ -3,7 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Simulacro INE – Módulo B Matemáticas v5</title>
+<title>Simulacro INE – Módulo B Matemáticas</title>
+
+<!-- CONFIG: cambia BANCO_URL, MODULO y TIEMPO_MIN para crear un nuevo simulacro -->
+<script>
+  const CONFIG = {
+    BANCO_URL:  'https://raw.githubusercontent.com/derechoelectoral2026/Bancos-Spen/main/banco-modulo-b-v2.js',
+    MODULO:     'Módulo B — Matemáticas',
+    SUBTITULO:  'Competencia matemática · Nivel avanzado · Diagnóstico',
+    TIEMPO_MIN: 45
+  };
+</script>
+
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
 body { font-family:'Segoe UI',Arial,sans-serif; background:#f0f4ff; color:#222; min-height:100dvh; overflow-x:hidden; }
@@ -272,274 +283,108 @@ body { font-family:'Segoe UI',Arial,sans-serif; background:#f0f4ff; color:#222; 
 
 <script>
 /* ═══════════════════════════════════════════════════
-   BANCO DE PREGUNTAS v5 — NIVEL AVANZADO
-   Errores v4 corregidos:
-   · Q conjuntos complemento: c era 1, correcto es 0 (respuesta = 2 elementos)
-   · Q función g(−2): c era 0 (−7), correcto es 2 (−3)
-   · Q proporción votantes: c era 1 (280), correcto es 2 (300)
-   · Q sistema 2x+3y=16 / x−y=1: no tiene solución entera → reemplazado
-   · renderOrder en revealed: ahora accede a orderState[idx] con fallback seguro
+   CARGA DINÁMICA DEL BANCO
 ═══════════════════════════════════════════════════ */
-const BANK = [
+let BANK = [];
 
-  /* ══════════════════════════════════════════
-     1.1 TEORÍA DE CONJUNTOS (5 preguntas)
-  ══════════════════════════════════════════ */
-  {
-    sa:"1.1", sal:"Teoría de conjuntos", type:"direct",
-    p:"En un distrito electoral: 180 funcionarios aprobaron el curso A, 140 aprobaron el curso B, y 60 aprobaron ambos cursos. El padrón total es de 280 funcionarios.",
-    pt:"Doble capacitación electoral",
-    q:"¿Cuántos funcionarios aprobaron <em>exactamente uno</em> de los dos cursos (A o B, pero no ambos)?",
-    o:["200","220","260"], c:0,
-    ex:"Solo A = 180−60 = 120. Solo B = 140−60 = 80. Solo uno = 120+80 = <strong>200</strong>. (No confundir con |A∪B| = 260, que incluye también a los que aprobaron ambos.)"
-  },
-  {
-    sa:"1.1", sal:"Teoría de conjuntos", type:"blank",
-    q:"Completa el enunciado:",
-    sentence:"Si U = {1,2,…,12}, A = {múltiplos de 3} y B = {múltiplos de 4}, entonces A ∩ B = ___ .",
-    o:["{3,6,9,12}","{12}","{4,8,12}"], c:1,
-    ex:"A = {3,6,9,12}, B = {4,8,12}. Los elementos en AMBOS son los múltiplos de 12 en U: A∩B = <strong>{12}</strong>."
-  },
-  {
-    sa:"1.1", sal:"Teoría de conjuntos", type:"direct",
-    p:"U = {1,2,3,…,15}. A = {x ∈ U | x es par}. B = {x ∈ U | x es múltiplo de 3}.",
-    pt:"Complemento de la unión",
-    q:"¿Cuántos elementos tiene (A ∪ B)ʹ?",
-    o:["4","5","6"], c:0,
-    ex:"A = {2,4,6,8,10,12,14} (7 elem). B = {3,6,9,12,15} (5 elem). A∩B = {6,12} (2 elem). |A∪B| = 7+5−2 = 10. (A∪B)ʹ = 15−10 = <strong>5</strong>. Espera: ¿U tiene 15 elementos? Sí: 1 a 15. Vuelve a verificar: (A∪B)ʹ = {1,5,7,11,13} = 5 elementos. Respuesta: <strong>5</strong>."
-  },
-  {
-    sa:"1.1", sal:"Teoría de conjuntos", type:"relation",
-    q:"Relaciona cada expresión de conjuntos con su significado correcto:",
-    left:["A △ B (diferencia simétrica)","Aʹ (complemento de A)","P(A) (conjunto potencia)"],
-    right:["Conjunto de todos los subconjuntos de A","Elementos en A o B, pero no en ambos","Elementos del universo que no pertenecen a A"],
-    pairs:[1,2,0],
-    ex:"A△B = elementos en uno u otro pero no en ambos. Aʹ = lo que no está en A dentro de U. P(A) = todos los subconjuntos de A."
-  },
-  {
-    sa:"1.1", sal:"Teoría de conjuntos", type:"order",
-    q:"Ordena los pasos para calcular la diferencia simétrica A △ B:",
-    items:["Calcular (A−B) ∪ (B−A)","Calcular B−A: elementos en B que no están en A","Calcular A−B: elementos en A que no están en B"],
-    correctOrder:[2,1,0],
-    ex:"Paso 1: Calcular A−B. Paso 2: Calcular B−A. Paso 3: Unir ambos resultados. A△B = (A−B)∪(B−A)."
-  },
+// Mostrar spinner mientras carga
+function mostrarLoading() {
+  const ss = document.getElementById('startScreen');
+  ss.innerHTML = `
+    <div style="padding:40px 0;text-align:center">
+      <div style="width:40px;height:40px;border:4px solid #bbdefb;border-top-color:#1565c0;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px"></div>
+      <p style="color:#666;font-size:.85rem">Cargando banco de preguntas…</p>
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  `;
+}
 
-  /* ══════════════════════════════════════════
-     1.2 ARITMÉTICA (5 preguntas)
-  ══════════════════════════════════════════ */
-  {
-    sa:"1.2", sal:"Aritmética", type:"direct",
-    p:null, pt:null,
-    q:"En una jornada electoral, el Partido X obtuvo 37,800 votos de un total de 126,000 votos válidos. El Partido Y obtuvo 1.5 veces los votos del Partido X. ¿Qué porcentaje del total representan los votos del Partido Y?",
-    o:["40%","45%","50%"], c:1,
-    ex:"Votos X = 37,800. Votos Y = 1.5 × 37,800 = 56,700. % Y = (56,700 / 126,000) × 100 = <strong>45%</strong>."
-  },
-  {
-    sa:"1.2", sal:"Aritmética", type:"blank",
-    q:"Completa el enunciado:",
-    sentence:"El presupuesto para capacitación era $72,000. Se incrementó un 15% en el primer año y se redujo un 10% en el segundo. El presupuesto final es $___.",
-    o:["$72,000","$74,520","$70,200"], c:1,
-    ex:"Tras incremento: 72,000 × 1.15 = 82,800. Tras reducción: 82,800 × 0.90 = <strong>$74,520</strong>. Nota: un +15% y luego −10% NO es equivalente a +5%."
-  },
-  {
-    sa:"1.2", sal:"Aritmética", type:"direct",
-    p:"Una urna electoral contiene boletas en proporción 5:3:2 entre candidatos A, B y C. En total hay 1,200 boletas.",
-    pt:"Proporción de votos",
-    q:"¿Cuántas boletas más tiene el candidato A respecto al candidato C?",
-    o:["260","300","360"], c:2,
-    ex:"Total partes = 5+3+2 = 10. A = (5/10)×1200 = 600. C = (2/10)×1200 = 240. Diferencia = 600−240 = <strong>360</strong>."
-  },
-  {
-    sa:"1.2", sal:"Aritmética", type:"blank",
-    q:"Completa el enunciado:",
-    sentence:"El MCD de 84 y 126 es ___ . (Necesario para repartir materiales en lotes iguales del mayor tamaño posible.)",
-    o:["14","21","42"], c:2,
-    ex:"84 = 2²×3×7. 126 = 2×3²×7. MCD = 2×3×7 = <strong>42</strong>."
-  },
-  {
-    sa:"1.2", sal:"Aritmética", type:"direct",
-    p:null, pt:null,
-    q:"Un equipo de supervisores trabaja 6.5 horas diarias. En el primer turno trabajan 14 días; en el segundo, 18 días con una reducción de 1.5 horas diarias. Si el pago es $75 por hora, ¿cuál es el pago total del equipo por ambos turnos?",
-    o:["$9,225","$9,487.50","$10,012.50"], c:0,
-    ex:"Turno 1: 6.5 × 14 = 91 h. Turno 2: (6.5−1.5) × 18 = 5 × 18 = 90 h. Total horas = 181. Pago = 181 × $75 = <strong>$13,575</strong>. Espera, los valores no coinciden con las opciones — revisando: si el pago es por persona y son N supervisores… la pregunta se refiere a un solo supervisor. 181 × 75 = 13,575. Opción correcta recalculada: ninguna. Para hacer el problema consistente: si el pago es $51/hora: 181 × 51 = 9,231 ≈ $9,225 con redondeo de horas. Uso las opciones con horas exactas: Turno 1: 6.5×14=91h. Turno 2: 5×18=90h. 181h × $51 = 9,231. Ajuste: el pago es $51/h → <strong>$9,225</strong> (aprox). Explicación oficial: Turno 1 = 91 h, Turno 2 = 90 h, total = 181 h. A $51/h → $9,231 ≈ $9,225."
-  },
+function mostrarError(url) {
+  const ss = document.getElementById('startScreen');
+  ss.innerHTML = `
+    <div style="padding:20px;text-align:center">
+      <div style="font-size:2rem;margin-bottom:10px">⚠️</div>
+      <h3 style="color:#b71c1c;margin-bottom:8px;font-size:1rem">No se pudo cargar el banco</h3>
+      <p style="color:#666;font-size:.8rem;margin-bottom:10px">Verifica que la URL sea correcta y accesible:</p>
+      <code style="background:#f5f5f5;padding:4px 8px;border-radius:4px;font-size:.75rem;word-break:break-all;display:block;margin:0 10px 16px">${url}</code>
+      <button onclick="cargarBanco()" style="background:#1565c0;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:.85rem">🔄 Reintentar</button>
+    </div>
+  `;
+}
 
-  /* ══════════════════════════════════════════
-     1.3 ÁLGEBRA (7 preguntas)
-  ══════════════════════════════════════════ */
-  {
-    sa:"1.3", sal:"Álgebra", type:"direct",
-    p:null, pt:null,
-    q:"Resuelve el sistema de ecuaciones:<br>3x + 2y = 20<br>x − y = 5",
-    o:["x=6, y=1","x=7, y=−1","x=5, y=0"], c:0,
-    ex:"De la 2ª ecuación: x = y+5. Sustituye en la 1ª: 3(y+5)+2y = 20 → 3y+15+2y = 20 → 5y = 5 → y = 1. Entonces x = 1+5 = <strong>6</strong>. Verificación: 3(6)+2(1)=20 ✓ y 6−1=5 ✓."
-  },
-  {
-    sa:"1.3", sal:"Álgebra", type:"blank",
-    q:"Completa el enunciado:",
-    sentence:"La solución del sistema 2x − y = 7 y x + 3y = 7 es x = ___ , y = 1.",
-    o:["3","4","5"], c:1,
-    ex:"Sustituye y=1 en la 1ª: 2x−1=7 → 2x=8 → x=<strong>4</strong>. Verificación en la 2ª: 4+3(1)=7 ✓."
-  },
-  {
-    sa:"1.3", sal:"Álgebra", type:"direct",
-    p:"La función h(x) = 2x² − 3x + 1",
-    pt:"Evaluación de función cuadrática",
-    q:"¿Cuánto vale h(−2) + h(3)?",
-    o:["20","25","28"], c:2,
-    ex:"h(−2) = 2(4)−3(−2)+1 = 8+6+1 = 15. h(3) = 2(9)−3(3)+1 = 18−9+1 = 10. Suma = 15+10 = <strong>25</strong>. Revisa: 15+10=25, opción B. Corrección: h(−2)=8+6+1=15; h(3)=18−9+1=10; suma=25."
-  },
-  {
-    sa:"1.3", sal:"Álgebra", type:"blank",
-    q:"Completa el enunciado:",
-    sentence:"La solución de la inecuación −4x + 12 > 0 es x ___ 3.",
-    o:["≥","<","≤"], c:1,
-    ex:"−4x > −12. Dividiendo entre −4 (se invierte la desigualdad): x < 3. Respuesta: x <strong>&lt;</strong> 3."
-  },
-  {
-    sa:"1.3", sal:"Álgebra", type:"order",
-    q:"Ordena los pasos para resolver por sustitución el sistema ax + by = c y x = d − ey:",
-    items:["Sustituir la expresión de x en la primera ecuación","Despejar x de la segunda ecuación (ya está despejada)","Calcular el valor de x sustituyendo y en x = d − ey","Resolver para y la ecuación resultante de un solo término"],
-    correctOrder:[1,0,3,2],
-    ex:"Paso 1: Identificar la ecuación ya despejada (x = d−ey). Paso 2: Sustituir en la otra ecuación. Paso 3: Resolver para y. Paso 4: Calcular x con el valor de y."
-  },
-  {
-    sa:"1.3", sal:"Álgebra", type:"relation",
-    q:"Relaciona cada expresión con su factorización correcta:",
-    left:["x² − 9", "x² + 6x + 9", "2x² − 8"],
-    right:["2(x+2)(x−2)","(x+3)²","(x+3)(x−3)"],
-    pairs:[2,1,0],
-    ex:"x²−9 = (x+3)(x−3) (diferencia de cuadrados). x²+6x+9 = (x+3)² (trinomio cuadrado perfecto). 2x²−8 = 2(x²−4) = 2(x+2)(x−2)."
-  },
-  {
-    sa:"1.3", sal:"Álgebra", type:"direct",
-    p:"Una comisión electoral necesita repartir N materiales en grupos de 12, 15 y 18 unidades, de modo que siempre sobre exactamente 5 materiales.",
-    pt:"Problema de congruencias",
-    q:"¿Cuál es el menor valor de N que satisface esa condición?",
-    o:["175","185","185"], c:1,
-    ex:"El número N debe cumplir N ≡ 5 (mod 12), N ≡ 5 (mod 15), N ≡ 5 (mod 18). Equivale a (N−5) ser múltiplo del MCM(12,15,18). MCM: 12=2²×3, 15=3×5, 18=2×3². MCM=2²×3²×5=180. Menor valor: N = 180+5 = <strong>185</strong>."
-  },
+function mostrarInicio() {
+  const M = CONFIG.TIEMPO_MIN;
+  const counts = {};
+  BANK.forEach(q => { counts[q.sa] = (counts[q.sa]||0) + 1; });
+  const total = BANK.length;
 
-  /* ══════════════════════════════════════════
-     1.4 PROBABILIDAD (4 preguntas)
-  ══════════════════════════════════════════ */
-  {
-    sa:"1.4", sal:"Probabilidad", type:"direct",
-    p:"Una urna contiene 5 bolillas rojas, 7 azules y 3 verdes. Se extraen 2 bolillas al azar <em>sin reposición</em>.",
-    pt:"Probabilidad compuesta sin reposición",
-    q:"¿Cuál es la probabilidad de que la primera sea roja y la segunda sea azul?",
-    o:["35/210","35/225","7/42"], c:0,
-    ex:"Total = 15 bolillas. P(1ª roja) = 5/15. P(2ª azul | 1ª roja) = 7/14. P = (5/15)×(7/14) = 35/210 = <strong>1/6</strong>. La opción equivalente es 35/210."
-  },
-  {
-    sa:"1.4", sal:"Probabilidad", type:"blank",
-    q:"Completa el enunciado:",
-    sentence:"Se lanza un dado justo tres veces. La probabilidad de obtener un número par en los tres lanzamientos es ___.",
-    o:["1/4","1/8","3/8"], c:1,
-    ex:"P(par en uno) = 3/6 = 1/2. Tres lanzamientos independientes: (1/2)³ = <strong>1/8</strong>."
-  },
-  {
-    sa:"1.4", sal:"Probabilidad", type:"direct",
-    p:"En una casilla hay 4 actas con error y 11 actas correctas. Se revisan 3 actas al azar <em>sin reposición</em>.",
-    pt:"Probabilidad combinatoria",
-    q:"¿Cuál es la probabilidad de que <em>exactamente 1</em> de las 3 actas revisadas tenga error?",
-    o:["44/91","55/91","33/91"], c:0,
-    ex:"Total maneras de elegir 3 de 15: C(15,3)=455. Formas de elegir 1 error de 4 y 2 correctas de 11: C(4,1)×C(11,2) = 4×55 = 220. P = 220/455 = <strong>44/91</strong>."
-  },
-  {
-    sa:"1.4", sal:"Probabilidad", type:"order",
-    q:"Ordena los pasos para calcular la probabilidad de un evento mediante combinatoria (P = casos favorables / casos totales):",
-    items:["Dividir los casos favorables entre los casos totales","Calcular el total de combinaciones posibles (casos totales)","Identificar el evento de interés y sus condiciones","Calcular las combinaciones que satisfacen el evento (casos favorables)"],
-    correctOrder:[2,1,3,0],
-    ex:"Paso 1: Identificar el evento. Paso 2: Calcular total de casos. Paso 3: Calcular casos favorables. Paso 4: Dividir para obtener la probabilidad."
-  },
+  const saLabels = {
+    "1.1":"1.1 Teoría de conjuntos",
+    "1.2":"1.2 Aritmética",
+    "1.3":"1.3 Álgebra",
+    "1.4":"1.4 Probabilidad",
+    "1.5":"1.5 Estadística",
+    "1.6":"1.6 Gráficos y tablas"
+  };
 
-  /* ══════════════════════════════════════════
-     1.5 ESTADÍSTICA (6 preguntas)
-  ══════════════════════════════════════════ */
-  {
-    sa:"1.5", sal:"Estadística", type:"direct",
-    p:"Tiempos de atención (en minutos) de 11 casillas: 18, 22, 19, 35, 20, 22, 17, 22, 25, 19, 21.",
-    pt:"Medidas de tendencia central",
-    q:"¿Cuál es la mediana del conjunto de datos?",
-    o:["21","22","20"], c:1,
-    ex:"Ordenados: 17,18,19,19,20,<strong>21</strong>,22,22,22,25,35. Con 11 datos, la posición central es la 6ª: <strong>21</strong>. Espera — la 6ª posición en esa lista es 21. Respuesta: 21. Verificación de opción: opción A=21. Correcto: c=0."
-  },
-  {
-    sa:"1.5", sal:"Estadística", type:"blank",
-    q:"Completa el enunciado:",
-    sentence:"En una distribución con media = 60, mediana = 55 y moda = 48, la distribución es ___ (asimétrica positiva / negativa / simétrica).",
-    o:["simétrica","asimétrica positiva (sesgada a la derecha)","asimétrica negativa (sesgada a la izquierda)"], c:1,
-    ex:"Cuando media > mediana > moda, la cola se extiende hacia los valores altos (derecha), por lo que la distribución es <strong>asimétrica positiva o sesgada a la derecha</strong>."
-  },
-  {
-    sa:"1.5", sal:"Estadística", type:"direct",
-    p:"Puntajes de 7 aspirantes: 68, 74, 80, 74, 92, 74, 66.",
-    pt:"Varianza de datos",
-    q:"¿Cuál es la media aritmética de estos datos?",
-    o:["74","75","76"], c:1,
-    ex:"Suma = 68+74+80+74+92+74+66 = 528. Media = 528/7 = <strong>75.43 ≈ 75</strong>. Opción B = 75. Correcto."
-  },
-  {
-    sa:"1.5", sal:"Estadística", type:"relation",
-    q:"Relaciona cada medida estadística con su definición precisa:",
-    left:["Desviación estándar","Coeficiente de variación","Percentil 90"],
-    right:["El 90% de los datos es menor o igual a este valor","Raíz cuadrada de la varianza; mide dispersión en las mismas unidades que los datos","Razón entre la desviación estándar y la media; permite comparar dispersión entre conjuntos con distintas unidades"],
-    pairs:[1,2,0],
-    ex:"Desviación estándar = √varianza. Coeficiente de variación = (σ/μ)×100. Percentil 90 = valor por debajo del cual se encuentra el 90% de los datos."
-  },
-  {
-    sa:"1.5", sal:"Estadística", type:"direct",
-    p:"Un conjunto de 10 datos tiene media = 45. Se descubre que uno de los datos fue registrado como 30 cuando en realidad era 60.",
-    pt:"Corrección de la media",
-    q:"¿Cuál es la media corregida?",
-    o:["46","47","48"], c:2,
-    ex:"Suma original = 45×10 = 450. Suma corregida = 450−30+60 = 480. Media corregida = 480/10 = <strong>48</strong>."
-  },
-  {
-    sa:"1.5", sal:"Estadística", type:"blank",
-    q:"Completa el enunciado:",
-    sentence:"Si la varianza de un conjunto de datos es 49, entonces la desviación estándar es ___ .",
-    o:["7","24.5","2,401"], c:0,
-    ex:"La desviación estándar es la raíz cuadrada de la varianza: √49 = <strong>7</strong>."
-  },
+  const pills = Object.entries(saLabels).map(([sa, label]) =>
+    `<div class="topic-pill"><span>${label}</span><span class="cnt">${counts[sa]||0}</span></div>`
+  ).join('');
 
-  /* ══════════════════════════════════════════
-     1.6 GRÁFICOS Y TABLAS (3 preguntas)
-  ══════════════════════════════════════════ */
-  {
-    sa:"1.6", sal:"Gráficos y tablas", type:"direct",
-    p:"Resultados electorales por partido (total: 180,000 votos):\n• Partido A: 72,000\n• Partido B: 54,000\n• Partido C: 36,000\n• Partido D: 18,000",
-    pt:"Tabla de resultados electorales",
-    q:"¿Cuál es la diferencia en puntos porcentuales entre el partido con mayor y el partido con menor votación?",
-    o:["25 pp","30 pp","35 pp"], c:1,
-    ex:"% A = 72,000/180,000 = 40%. % D = 18,000/180,000 = 10%. Diferencia = 40%−10% = <strong>30 puntos porcentuales</strong>."
-  },
-  {
-    sa:"1.6", sal:"Gráficos y tablas", type:"blank",
-    p:"Participación en 5 elecciones: 2006: 59%, 2009: 44%, 2012: 63%, 2015: 47%, 2018: 63%, 2021: 52%.",
-    pt:"Tendencia de participación",
-    q:"Completa el enunciado:",
-    sentence:"La participación promedio en los años con elecciones intermedias (2009, 2015, 2021) fue ___ %, comparada con el 61.7% de los años presidenciales.",
-    o:["47.7%","48.3%","49.0%"], c:0,
-    ex:"Intermedias: (44+47+52)/3 = 143/3 = <strong>47.7%</strong>. Menor que el 61.7% de las presidenciales, lo que muestra menor participación en elecciones intermedias."
-  },
-  {
-    sa:"1.6", sal:"Gráficos y tablas", type:"relation",
-    p:"Tabla de capacitaciones por módulo (total: 1,200 asistentes):\n• Módulo 1: 480\n• Módulo 2: 360\n• Módulo 3: 240\n• Módulo 4: 120",
-    pt:"Distribución porcentual",
-    q:"Relaciona cada módulo con su porcentaje del total:",
-    left:["Módulo 1","Módulo 2","Módulo 4"],
-    right:["10%","40%","30%"],
-    pairs:[1,2,0],
-    ex:"M1: 480/1200=40%. M2: 360/1200=30%. M4: 120/1200=10%. Verificación: 40+30+20+10=100% ✓."
+  document.getElementById('startScreen').innerHTML = `
+    <div class="v5-badge">✨ Versión 5 · Nivel avanzado</div>
+    <h2>🔢 ${CONFIG.MODULO}</h2>
+    <p style="background:#fff3e0;border-radius:9px;padding:10px;color:#e65100;font-weight:600;margin-bottom:14px;font-size:.82rem">
+      🔥 Ejercicios de mayor complejidad · Razonamiento multietapa · Contexto electoral real
+    </p>
+    <div class="info-grid">
+      <div class="info-card"><div class="num">${total}</div><div class="lbl">Preguntas</div></div>
+      <div class="info-card"><div class="num">${M}</div><div class="lbl">Minutos</div></div>
+      <div class="info-card"><div class="num">6</div><div class="lbl">Subáreas</div></div>
+    </div>
+    <p style="font-size:.78rem;color:#555;font-weight:600;margin-bottom:7px">Tipos de reactivos del examen real INE:</p>
+    <div class="format-legend">
+      <span class="fmt-badge" style="background:#e8eaf6;color:#3949ab">📝 Cuestionamiento directo</span>
+      <span class="fmt-badge" style="background:#e0f2f1;color:#00796b">✏️ Completamiento</span>
+      <span class="fmt-badge" style="background:#fff3e0;color:#e65100">🔢 Ordenamiento</span>
+      <span class="fmt-badge" style="background:#fce4ec;color:#c2185b">🔗 Relación de elementos</span>
+    </div>
+    <p style="font-size:.75rem;color:#888;margin-bottom:13px">⚡ El orden de preguntas cambia en cada sesión · 30 preguntas por simulacro</p>
+    <div class="topic-grid">${pills}</div>
+    <button class="btn btn-primary btn-lg" style="width:100%" onclick="startExam()">Comenzar diagnóstico →</button>
+  `;
+
+  // Header y timer
+  document.querySelector('.header h1').textContent = CONFIG.MODULO + ' 🔀';
+  document.querySelector('.header p').textContent  = CONFIG.SUBTITULO;
+  document.title = 'Simulacro INE – ' + CONFIG.MODULO;
+  document.getElementById('timer').textContent = M + ':00';
+}
+
+async function cargarBanco() {
+  mostrarLoading();
+  try {
+    const res = await fetch(CONFIG.BANCO_URL + '?v=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const code = await res.text();
+    const fn = new Function(code + '\n return BANCO_MODULO_B;');
+    const banco = fn();
+    if (!banco || !Array.isArray(banco) || banco.length === 0)
+      throw new Error('Banco vacío o nombre de variable incorrecto.');
+    BANK.length = 0;
+    BANK.push(...banco);
+    mostrarInicio();
+  } catch (err) {
+    console.error('Error cargando banco:', err);
+    mostrarError(CONFIG.BANCO_URL);
   }
-];
+}
+
 
 /* ═══════════════════════════════════════════════════
    ESTADO GLOBAL
 ═══════════════════════════════════════════════════ */
-const TIME_LIMIT = 45 * 60;
+let TIME_LIMIT = CONFIG.TIEMPO_MIN * 60;
 let Q = [], answers = [], revealed = [], current = 0, timerInterval, secondsLeft;
 let relState   = [];
 let orderState = [];
@@ -565,17 +410,32 @@ function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=
    INICIO
 ═══════════════════════════════════════════════════ */
 function startExam(){
+  if (!BANK.length) { alert('El banco de preguntas aún no está cargado.'); return; }
+  TIME_LIMIT = CONFIG.TIEMPO_MIN * 60;
+
+  // Selección proporcional: hasta 30 preguntas del banco
+  const LIMITE = 30;
   const byArea = {};
   BANK.forEach(q => { if(!byArea[q.sa]) byArea[q.sa]=[]; byArea[q.sa].push(q); });
   Object.keys(byArea).forEach(k => byArea[k] = shuffle(byArea[k]));
-  Q = shuffle([
-    ...byArea["1.1"],
-    ...byArea["1.2"],
-    ...byArea["1.3"],
-    ...byArea["1.4"],
-    ...byArea["1.5"],
-    ...byArea["1.6"]
-  ]);
+
+  let sel = [];
+  if (BANK.length <= LIMITE) {
+    sel = BANK;
+  } else {
+    const total = BANK.length;
+    Object.keys(byArea).forEach(sa => {
+      const n = Math.round((byArea[sa].length / total) * LIMITE);
+      sel.push(...byArea[sa].slice(0, n));
+    });
+    while (sel.length < LIMITE) {
+      const extras = BANK.filter(q => !sel.includes(q));
+      if (!extras.length) break;
+      sel.push(extras[Math.floor(Math.random() * extras.length)]);
+    }
+    sel = sel.slice(0, LIMITE);
+  }
+  Q = shuffle(sel);
 
   answers    = new Array(Q.length).fill(null);
   revealed   = new Array(Q.length).fill(false);
@@ -991,6 +851,8 @@ function reviewExam(){
   renderQuestion(0);
   window.scrollTo(0,0);
 }
+
+cargarBanco();
 </script>
 </body>
 </html>
